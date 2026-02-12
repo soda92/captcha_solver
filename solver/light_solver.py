@@ -1,6 +1,6 @@
 import os
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageFilter
 from pathlib import Path
 import shutil
 
@@ -12,11 +12,38 @@ class CaptchaCracker:
         self.database = {}  # { 'A': [array, array...], 'B': ... }
         self.loaded = False
 
+    def clean_borders(self, img):
+        """
+        Removes borders by turning rows/cols that are > 50% black into white.
+        Assumes img is 'L' mode (0=Black/Text, 255=White/Bg).
+        """
+        arr = np.array(img)
+        h, w = arr.shape
+        
+        # Check rows
+        for y in range(h):
+            # Count black pixels (0)
+            black_count = np.sum(arr[y, :] == 0)
+            if black_count > w * 0.5:
+                arr[y, :] = 255 # Clear row
+                
+        # Check cols
+        for x in range(w):
+            black_count = np.sum(arr[:, x] == 0)
+            if black_count > h * 0.5:
+                arr[:, x] = 255 # Clear col
+                
+        return Image.fromarray(arr)
+
     def preprocess(self, img_path):
         """Standardize image: Grayscale -> Binary -> Crop Borders"""
         img = Image.open(img_path).convert("L")
         # Threshold to binary (adjust 140 if your images are noisy)
         img = img.point(lambda p: 255 if p > 140 else 0)
+        # Remove massive borders
+        img = self.clean_borders(img)
+        # Thicken characters to repair faint/eroded templates
+        img = img.filter(ImageFilter.MinFilter(3))
         return img
 
     def segment(self, img):
@@ -72,7 +99,7 @@ class CaptchaCracker:
         then pads with black to fill the box.
         """
         # Create black background
-        new_img = Image.new("L", size, 0)
+        new_img = Image.new("L", size, 255)
 
         # Calculate resize ratio
         img.thumbnail(size, Image.Resampling.NEAREST)
@@ -108,6 +135,11 @@ class CaptchaCracker:
 
                 # We expect 4 chars for 4 letters in label
                 for i, char_img in enumerate(chars):
+                    # Check for empty/garbage templates
+                    # After thickening, a real char should have > 50 black pixels
+                    if np.sum(np.array(char_img) == 0) < 50:
+                        continue
+
                     char_val = label[i]
                     save_dir = self.templates_dir / char_val
                     save_dir.mkdir(exist_ok=True)
@@ -152,14 +184,11 @@ class CaptchaCracker:
             min_dist = float("inf")
 
             # 2. The "Wiggle" Check
-            # We will test the query image at 5 positions: Center, Left, Right, Up, Down
-            shifts = [
-                (0, 0),  # Center
-                (1, 0),  # Down
-                (-1, 0),  # Up
-                (0, 1),  # Right
-                (0, -1),  # Left
-            ]
+            # We will test the query image at positions from -2 to +2 in both X and Y
+            shifts = []
+            for dy in range(-2, 3):
+                for dx in range(-2, 3):
+                    shifts.append((dy, dx))
 
             # Pre-calculate shifted versions of the query image
             shifted_queries = []
@@ -170,14 +199,14 @@ class CaptchaCracker:
 
                 # IMPORTANT: Rolling wraps pixels around (top becomes bottom).
                 # We must zero out the wrapped pixels to avoid noise.
-                if dy == 1:
-                    shifted[0, :] = 0
-                elif dy == -1:
-                    shifted[-1, :] = 0
-                if dx == 1:
-                    shifted[:, 0] = 0
-                elif dx == -1:
-                    shifted[:, -1] = 0
+                if dy > 0:
+                    shifted[:dy, :] = 0
+                elif dy < 0:
+                    shifted[dy:, :] = 0
+                if dx > 0:
+                    shifted[:, :dx] = 0
+                elif dx < 0:
+                    shifted[:, dx:] = 0
 
                 shifted_queries.append(shifted.flatten())
 
