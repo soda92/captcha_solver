@@ -64,7 +64,26 @@ class CaptchaCracker:
                 cuts.append(img.crop((i * step, 0, (i + 1) * step, h)))
 
         # Resize all to uniform template size
-        return [c.resize(self.char_size, Image.Resampling.NEAREST) for c in cuts]
+        return [self.resize_pad(c, self.char_size) for c in cuts]
+
+    def resize_pad(self, img, size):
+        """
+        Resizes image to fit inside 'size' (w, h) while keeping aspect ratio,
+        then pads with black to fill the box.
+        """
+        # Create black background
+        new_img = Image.new("L", size, 0)
+
+        # Calculate resize ratio
+        img.thumbnail(size, Image.Resampling.NEAREST)
+
+        # Center the character
+        w, h = img.size
+        x_pad = (size[0] - w) // 2
+        y_pad = (size[1] - h) // 2
+
+        new_img.paste(img, (x_pad, y_pad))
+        return new_img
 
     def build_templates(self, source_folder):
         """
@@ -120,26 +139,62 @@ class CaptchaCracker:
         if not self.loaded:
             self.load_db()
 
+        # 1. Get the cropped character images
         chars = self.segment(self.preprocess(img_path))
         result = ""
 
         for char_img in chars:
-            query = np.array(char_img).flatten()
+            # We convert the query image to a raw 2D array (not flattened yet)
+            # This allows us to "roll" (shift) pixels easily.
+            query_arr = np.array(char_img)
+
             best_char = "?"
             min_dist = float("inf")
 
-            # Compare against every character class
-            for char_key, templates in self.database.items():
-                # Vectorized Euclidean distance against ALL templates of this char
-                # (template - query)^2
-                diff = templates - query
-                dists = np.sum(diff**2, axis=1)
+            # 2. The "Wiggle" Check
+            # We will test the query image at 5 positions: Center, Left, Right, Up, Down
+            shifts = [
+                (0, 0),  # Center
+                (1, 0),  # Down
+                (-1, 0),  # Up
+                (0, 1),  # Right
+                (0, -1),  # Left
+            ]
 
-                # Find the best match within this character class
-                local_min = np.min(dists)
-                if local_min < min_dist:
-                    min_dist = local_min
-                    best_char = char_key
+            # Pre-calculate shifted versions of the query image
+            shifted_queries = []
+            for dy, dx in shifts:
+                # np.roll shifts the array, 'axis' handles direction
+                shifted = np.roll(query_arr, dy, axis=0)
+                shifted = np.roll(shifted, dx, axis=1)
+
+                # IMPORTANT: Rolling wraps pixels around (top becomes bottom).
+                # We must zero out the wrapped pixels to avoid noise.
+                if dy == 1:
+                    shifted[0, :] = 0
+                elif dy == -1:
+                    shifted[-1, :] = 0
+                if dx == 1:
+                    shifted[:, 0] = 0
+                elif dx == -1:
+                    shifted[:, -1] = 0
+
+                shifted_queries.append(shifted.flatten())
+
+            # 3. Compare against DB
+            for char_key, templates in self.database.items():
+                # templates shape: (N, 1024) if 32x32
+
+                # Check ALL shifts against ALL templates for this char
+                for q_vec in shifted_queries:
+                    # Vectorized diff: (Templates - Shifted_Query)
+                    diff = templates - q_vec
+                    dist = np.sum(diff**2, axis=1)
+
+                    local_min = np.min(dist)
+                    if local_min < min_dist:
+                        min_dist = local_min
+                        best_char = char_key
 
             result += best_char
         return result
@@ -163,7 +218,7 @@ class CaptchaCracker:
         counts = {}
         missing = []
 
-        print(f"\n--- DATASET HEALTH REPORT ---")
+        print("\n--- DATASET HEALTH REPORT ---")
 
         # 2. Check every single expected character
         for char in expected_chars:
