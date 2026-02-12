@@ -1,12 +1,12 @@
 import onnxruntime as ort
 import numpy as np
 import os
-from solver.light_solver import CaptchaCracker
+from solver.utils import ImgUtil
 
 
 class ONNXSolver:
     def __init__(self, model_path="model.onnx"):
-        self.cracker = CaptchaCracker()
+        self.util = ImgUtil()
         self.model_path = model_path
         self.classes = sorted(list("23456789ABCDEFGHJKLMNPQRSTUVWXYZ"))
         self.idx_to_char = {i: c for i, c in enumerate(self.classes)}
@@ -19,8 +19,8 @@ class ONNXSolver:
 
     def solve(self, img_path):
         # Preprocess & Segment
-        img = self.cracker.preprocess(img_path)
-        chars = self.cracker.segment(img)
+        img = self.util.preprocess(img_path)
+        chars = self.util.segment(img)
 
         result = ""
 
