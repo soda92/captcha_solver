@@ -14,20 +14,23 @@ class CaptchaCracker:
     def clean_borders(self, img):
         """
         Removes borders by turning rows/cols that are > 50% black into white.
+        Only checks top/bottom 20% and left/right 20% to avoid deleting character parts.
         Assumes img is 'L' mode (0=Black/Text, 255=White/Bg).
         """
         arr = np.array(img)
         h, w = arr.shape
 
-        # Check rows
-        for y in range(h):
+        # Check rows (Top 20% and Bottom 20%)
+        limit_h = int(h * 0.2)
+        for y in list(range(0, limit_h)) + list(range(h - limit_h, h)):
             # Count black pixels (0)
             black_count = np.sum(arr[y, :] == 0)
             if black_count > w * 0.5:
                 arr[y, :] = 255  # Clear row
 
-        # Check cols
-        for x in range(w):
+        # Check cols (Left 20% and Right 20%)
+        limit_w = int(w * 0.2)
+        for x in list(range(0, limit_w)) + list(range(w - limit_w, w)):
             black_count = np.sum(arr[:, x] == 0)
             if black_count > h * 0.5:
                 arr[:, x] = 255  # Clear col
@@ -37,12 +40,10 @@ class CaptchaCracker:
     def preprocess(self, img_path):
         """Standardize image: Grayscale -> Binary -> Crop Borders"""
         img = Image.open(img_path).convert("L")
-        # Threshold to binary (adjust 140 if your images are noisy)
-        img = img.point(lambda p: 255 if p > 140 else 0)
+        # Threshold to binary (adjust 200 to capture faint text edges)
+        img = img.point(lambda p: 255 if p > 200 else 0)
         # Remove massive borders
         img = self.clean_borders(img)
-        # Thicken characters to repair faint/eroded templates
-        img = img.filter(ImageFilter.MinFilter(3))
         return img
 
     def segment(self, img):

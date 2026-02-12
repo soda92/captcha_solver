@@ -1,6 +1,6 @@
 *.pth
 *.onnx
-
+/test_images
 /templates
 
 

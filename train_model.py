@@ -88,7 +88,7 @@ def train():
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=0.001)
 
-    epochs = 150
+    epochs = 300
     print(f"Training for {epochs} epochs...")
 
     for epoch in range(epochs):
