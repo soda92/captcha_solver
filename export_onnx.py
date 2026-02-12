@@ -3,7 +3,7 @@ from solver.ml_solver import SimpleCNN, MLSolver
 
 # 1. Load Model
 model_path = "model.pth"
-solver = MLSolver(model_path) # Helper to get class count
+solver = MLSolver(model_path)  # Helper to get class count
 num_classes = len(solver.classes)
 model = SimpleCNN(num_classes)
 model.load_state_dict(torch.load(model_path, map_location="cpu"))
@@ -20,9 +20,9 @@ torch.onnx.export(
     dummy_input,
     output_path,
     verbose=True,
-    input_names=['input'],
-    output_names=['output'],
-    dynamic_axes={'input': {0: 'batch_size'}, 'output': {0: 'batch_size'}}
+    input_names=["input"],
+    output_names=["output"],
+    dynamic_axes={"input": {0: "batch_size"}, "output": {0: "batch_size"}},
 )
 
 print(f"Model exported to {output_path}")

@@ -1,4 +1,3 @@
-import os
 import numpy as np
 from PIL import Image, ImageFilter
 from pathlib import Path
@@ -19,20 +18,20 @@ class CaptchaCracker:
         """
         arr = np.array(img)
         h, w = arr.shape
-        
+
         # Check rows
         for y in range(h):
             # Count black pixels (0)
             black_count = np.sum(arr[y, :] == 0)
             if black_count > w * 0.5:
-                arr[y, :] = 255 # Clear row
-                
+                arr[y, :] = 255  # Clear row
+
         # Check cols
         for x in range(w):
             black_count = np.sum(arr[:, x] == 0)
             if black_count > h * 0.5:
-                arr[:, x] = 255 # Clear col
-                
+                arr[:, x] = 255  # Clear col
+
         return Image.fromarray(arr)
 
     def preprocess(self, img_path):

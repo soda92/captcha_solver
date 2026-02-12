@@ -1,4 +1,5 @@
 from solver.light_solver import CaptchaCracker
+
 cracker = CaptchaCracker()
 
 # STEP 1: Run this ONCE to generate your templates folder

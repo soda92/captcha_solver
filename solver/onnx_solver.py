@@ -3,13 +3,14 @@ import numpy as np
 import os
 from solver.light_solver import CaptchaCracker
 
+
 class ONNXSolver:
     def __init__(self, model_path="model.onnx"):
-        self.cracker = CaptchaCracker() 
+        self.cracker = CaptchaCracker()
         self.model_path = model_path
         self.classes = sorted(list("23456789ABCDEFGHJKLMNPQRSTUVWXYZ"))
         self.idx_to_char = {i: c for i, c in enumerate(self.classes)}
-        
+
         if os.path.exists(model_path):
             self.ort_session = ort.InferenceSession(model_path)
             self.input_name = self.ort_session.get_inputs()[0].name
@@ -20,9 +21,9 @@ class ONNXSolver:
         # Preprocess & Segment
         img = self.cracker.preprocess(img_path)
         chars = self.cracker.segment(img)
-        
+
         result = ""
-        
+
         for char_img in chars:
             # Prepare input
             # Convert PIL to Numpy
@@ -31,12 +32,12 @@ class ONNXSolver:
             img_np /= 255.0
             # Reshape to (1, 1, 32, 32)
             img_np = img_np.reshape(1, 1, 32, 32)
-            
+
             # Inference
             outputs = self.ort_session.run(None, {self.input_name: img_np})
             # outputs[0] is (Batch, NumClasses)
             predicted_idx = np.argmax(outputs[0], axis=1)[0]
-            
+
             result += self.idx_to_char.get(predicted_idx, "?")
-                
+
         return result
