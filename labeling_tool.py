@@ -4,7 +4,7 @@ import requests
 import time
 from datetime import datetime
 from PySide2.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
-                             QHBoxLayout, QLabel, QLineEdit, QPushButton, QMessageBox)
+                             QHBoxLayout, QLabel, QLineEdit, QPushButton, QMessageBox, QCheckBox)
 from PySide2.QtGui import QPixmap, QImage
 from PySide2.QtCore import Qt
 from io import BytesIO
@@ -15,8 +15,11 @@ class LabelingTool(QMainWindow):
         super().__init__()
         self.setWindowTitle("Captcha Labeling Tool")
         self.raw_dir = "raw_captchas"
+        self.test_dir = "test_images"
         if not os.path.exists(self.raw_dir):
             os.makedirs(self.raw_dir)
+        if not os.path.exists(self.test_dir):
+            os.makedirs(self.test_dir)
             
         # Model
         self.solver = None
@@ -50,6 +53,10 @@ class LabelingTool(QMainWindow):
         self.input_field.returnPressed.connect(self.save_image) # Enter to save
         input_layout.addWidget(self.input_field)
         layout.addLayout(input_layout)
+        
+        # Options
+        self.save_test_cb = QCheckBox("Save to Test Dir")
+        layout.addWidget(self.save_test_cb)
         
         # Buttons
         btn_layout = QHBoxLayout()
@@ -131,21 +138,24 @@ class LabelingTool(QMainWindow):
         if not self.current_image_data:
             return
             
+        # Determine target directory
+        target_dir = self.test_dir if self.save_test_cb.isChecked() else self.raw_dir
+            
         # Check if file exists, append suffix if needed
         base_name = label
         filename = f"{base_name}.jpeg"
-        save_path = os.path.join(self.raw_dir, filename)
+        save_path = os.path.join(target_dir, filename)
         
         counter = 1
         while os.path.exists(save_path):
             filename = f"{base_name}_{counter}.jpeg"
-            save_path = os.path.join(self.raw_dir, filename)
+            save_path = os.path.join(target_dir, filename)
             counter += 1
         
         try:
             with open(save_path, "wb") as f:
                 f.write(self.current_image_data)
-            self.status_label.setText(f"Saved {filename}")
+            self.status_label.setText(f"Saved {filename} to {target_dir}")
             self.fetch_image() # Auto fetch next
         except Exception as e:
             self.status_label.setText(f"Save Error: {e}")
