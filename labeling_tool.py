@@ -132,58 +132,15 @@ class LabelingTool(QMainWindow):
             return
             
         # Check if file exists, append suffix if needed
-        filename = f"{label}.jpeg"
+        base_name = label
+        filename = f"{base_name}.jpeg"
         save_path = os.path.join(self.raw_dir, filename)
         
         counter = 1
         while os.path.exists(save_path):
-            # Check if identical? Or just skip?
-            # User might be correcting a label, or adding duplicate.
-            # We assume adding new data.
-            # Actually, raw_captchas usually relies on unique filenames for unique labels?
-            # If "ABCD.jpeg" exists, and we have a NEW image for "ABCD".
-            # We should probably rename the old one or name this one "ABCD_1.jpeg"?
-            # My training script uses `f.stem.upper()`. "ABCD_1" -> "ABCD_1" -> len!=4.
-            # So naming MUST be exactly 4 chars?
-            # NO. `label = f.stem.upper()`.
-            # `if len(label) != 4: continue`.
-            # So "ABCD_1.jpeg" would be SKIPPED by training script!
-            
-            # I must rename to something that parses to 4 chars?
-            # Or modify training script to handle suffixes.
-            # Wait, `raw_captchas` usually contains `ABCD.jpeg`.
-            # If I have multiple ABCD, I can't name them all `ABCD.jpeg`.
-            
-            # Current `train_model.py` logic:
-            # `label = f.stem.upper()`
-            # `if len(label) != 4: continue`
-            
-            # This is a limitation of the current training script.
-            # It only supports ONE image per label?
-            # Or filenames like `ABCD.jpeg`?
-            # If I have `raw_captchas/2cb8.jpeg` and I add another `2cb8`.
-            # I can't.
-            
-            # I should verify this.
-            # `raw_captchas` has `2a42.jpeg`, `2dhp.jpeg`...
-            # It seems they are unique captchas.
-            
-            # If I encounter a duplicate label (e.g. `2CB8` again), I can't save it with the current naming convention?
-            # Unless the label IS the captcha text.
-            # Captcha text is usually random. Duplicate text is rare (1/36^4).
-            # So overwriting or skipping might be acceptable?
-            # Or I should update `train_model.py` to handle `ABCD_1.jpeg` -> `ABCD`.
-            pass
-            
-            # For now, I will assume unique labels.
-            # If collision, I'll warn.
-            if os.path.exists(save_path):
-                 reply = QMessageBox.question(self, "Overwrite?", 
-                                            f"File {filename} exists. Overwrite?", 
-                                            QMessageBox.Yes | QMessageBox.No)
-                 if reply == QMessageBox.No:
-                     return
-                 break # Proceed to overwrite
+            filename = f"{base_name}_{counter}.jpeg"
+            save_path = os.path.join(self.raw_dir, filename)
+            counter += 1
         
         try:
             with open(save_path, "wb") as f:
