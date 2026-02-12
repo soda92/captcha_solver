@@ -26,9 +26,10 @@ class CaptchaDataset(Dataset):
 
         for f in files:
             # Handle filenames like "ABCD_1.jpeg" -> label "ABCD"
-            label = f.stem.split('_')[0].upper()
-            if len(label) != 4: continue
-            
+            label = f.stem.split("_")[0].upper()
+            if len(label) != 4:
+                continue
+
             try:
                 # Use cracker to get segments
                 # Preprocess & Segment using the IMPROVED logic (borders, thickening)
