@@ -40,8 +40,16 @@ class CaptchaCracker:
     def preprocess(self, img_path):
         """Standardize image: Grayscale -> Binary -> Crop Borders"""
         img = Image.open(img_path).convert("L")
-        # Threshold to binary (adjust 200 to capture faint text edges)
-        img = img.point(lambda p: 255 if p > 200 else 0)
+        
+        # Adaptive Thresholding
+        hist = img.histogram()
+        # Find the most common pixel value (Background)
+        bg_color = hist.index(max(hist))
+        # Set threshold slightly below background
+        # Ensure threshold is reasonable (not too low)
+        threshold = max(bg_color - 30, 100)
+        
+        img = img.point(lambda p: 255 if p > threshold else 0)
         # Remove massive borders
         img = self.clean_borders(img)
         return img
