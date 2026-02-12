@@ -98,7 +98,7 @@ class CaptchaCracker:
         Resizes image to fit inside 'size' (w, h) while keeping aspect ratio,
         then pads with black to fill the box.
         """
-        # Create black background
+        # Create white background
         new_img = Image.new("L", size, 255)
 
         # Calculate resize ratio
