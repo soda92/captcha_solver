@@ -14,7 +14,7 @@ from PySide2.QtWidgets import (
     QCheckBox,
 )
 from PySide2.QtGui import QPixmap
-from PySide2.QtCore import Qt
+from PySide2.QtCore import Qt, QTimer
 from solver.onnx_solver import ONNXSolver
 
 
@@ -85,8 +85,19 @@ class LabelingTool(QMainWindow):
         # Initial Fetch
         self.fetch_image()
 
+    def set_controls_enabled(self, enabled):
+        self.fetch_btn.setEnabled(enabled)
+        self.save_btn.setEnabled(enabled)
+        self.input_field.setEnabled(enabled)
+        if enabled:
+            self.input_field.setFocus()
+            self.input_field.selectAll()
+
     def fetch_image(self):
         try:
+            # Disable controls during fetch/wait
+            self.set_controls_enabled(False)
+
             # Generate URL with timestamp
             # Format: Thu Feb 12 2026 15:16:32 GMT+0800 (China Standard Time)
             now = datetime.now()
@@ -110,14 +121,22 @@ class LabelingTool(QMainWindow):
 
                 # Predict
                 self.predict_label()
-                self.status_label.setText("Fetched.")
-                self.input_field.setFocus()
-                self.input_field.selectAll()
+                self.status_label.setText("Fetched. Wait...")
+
+                QTimer.singleShot(
+                    7000,
+                    lambda: [
+                        self.set_controls_enabled(True),
+                        self.status_label.setText("Ready."),
+                    ],
+                )
             else:
                 self.status_label.setText(f"Error: {response.status_code}")
+                self.set_controls_enabled(True)
 
         except Exception as e:
             self.status_label.setText(f"Error: {e}")
+            self.set_controls_enabled(True)
 
     def predict_label(self):
         if not self.solver or not self.current_image_data:
