@@ -1,3 +1,11 @@
+*.pth
+*.onnx
+/test_images
+/templates
+
+/synthetic_captchas
+
+/*.jpeg
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
