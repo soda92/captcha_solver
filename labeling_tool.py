@@ -159,12 +159,17 @@ class LabelingTool(QMainWindow):
             print(f"Prediction error: {e}")
 
     def save_image(self):
+        # Disable controls immediately
+        self.set_controls_enabled(False)
+
         label = self.input_field.text().strip().upper()
         if len(label) != 4:
             self.status_label.setText("Label must be 4 characters!")
+            self.set_controls_enabled(True)
             return
 
         if not self.current_image_data:
+            self.set_controls_enabled(True)
             return
 
         # Determine target directory
@@ -184,10 +189,23 @@ class LabelingTool(QMainWindow):
         try:
             with open(save_path, "wb") as f:
                 f.write(self.current_image_data)
-            self.status_label.setText(f"Saved {filename} to {target_dir}")
-            self.fetch_image()  # Auto fetch next
+            self.status_label.setText(f"Saved {filename}. Wait...")
+
+            # Auto fetch next after delay
+            # We chain the delay: Wait 500ms -> Fetch -> (Fetch waits 500ms)
+            # Or just fetch immediately?
+            # User wants mandatory wait.
+            # If we fetch immediately, fetch_image will trigger ITS OWN wait.
+            # So we just call fetch_image after 500ms?
+            # Or call fetch_image immediately, and let it handle the UI lock?
+            # But fetch_image starts by locking UI.
+            # So if we are locked here, we can just call fetch_image inside the timer?
+
+            QTimer.singleShot(500, lambda: self.fetch_image())
+
         except Exception as e:
             self.status_label.setText(f"Save Error: {e}")
+            self.set_controls_enabled(True)
 
 
 if __name__ == "__main__":
