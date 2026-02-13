@@ -1,0 +1,1 @@
+uv run train_model.py && uv run export_onnx.py && uv run evaluate_model.py

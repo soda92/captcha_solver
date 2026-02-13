@@ -2,6 +2,8 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader
+import torch.utils
+import torch.utils.data
 from torchvision import transforms
 from pathlib import Path
 from solver.ml_solver import MLSolver
@@ -9,7 +11,7 @@ from solver.utils import ImgUtil
 
 # Training Configuration
 OVERSAMPLE = 10
-EPOCHS = 50
+EPOCHS = 70
 
 
 class CaptchaDataset(Dataset):
