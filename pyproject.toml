@@ -10,6 +10,7 @@ dependencies = [
     "pillow>=10.4.0",
     "pyside2>=5.15.2.1",
     "requests>=2.32.4",
+    "tomli>=2.4.0",
 ]
 
 [build-system]

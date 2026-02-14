@@ -1,9 +1,7 @@
-import sys
 import os
-import requests
+import time
 from datetime import datetime
 from PySide2.QtWidgets import (
-    QApplication,
     QMainWindow,
     QWidget,
     QVBoxLayout,
@@ -12,22 +10,31 @@ from PySide2.QtWidgets import (
     QLineEdit,
     QPushButton,
     QCheckBox,
+    QComboBox,
+    QApplication
 )
 from PySide2.QtGui import QPixmap
 from PySide2.QtCore import Qt, QTimer
 from solver.onnx_solver import ONNXSolver
-
+from labeling_tool.session_manager import SessionManager
 
 class LabelingTool(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Captcha Labeling Tool")
         self.raw_dir = "raw_captchas"
+        self.num_dir = "num_captchas"
         self.test_dir = "test_images"
         if not os.path.exists(self.raw_dir):
             os.makedirs(self.raw_dir)
+        if not os.path.exists(self.num_dir):
+            os.makedirs(self.num_dir)
         if not os.path.exists(self.test_dir):
             os.makedirs(self.test_dir)
+
+        # Session Manager
+        self.session_manager = SessionManager()
+        self.source_map = self.session_manager.get_sources()
 
         # Model
         self.solver = None
@@ -46,6 +53,14 @@ class LabelingTool(QMainWindow):
         self.setCentralWidget(central_widget)
         layout = QVBoxLayout(central_widget)
 
+        # Top Controls (Source Selection)
+        top_layout = QHBoxLayout()
+        top_layout.addWidget(QLabel("Source:"))
+        self.source_combo = QComboBox()
+        self.source_combo.addItems(list(self.source_map.keys()))
+        top_layout.addWidget(self.source_combo)
+        layout.addLayout(top_layout)
+
         # Image Display
         self.image_label = QLabel("No Image")
         self.image_label.setAlignment(Qt.AlignCenter)
@@ -57,8 +72,8 @@ class LabelingTool(QMainWindow):
         input_layout = QHBoxLayout()
         input_layout.addWidget(QLabel("Label:"))
         self.input_field = QLineEdit()
-        self.input_field.setMaxLength(4)
-        self.input_field.returnPressed.connect(self.save_image)  # Enter to save
+        self.input_field.setMaxLength(10)
+        self.input_field.returnPressed.connect(self.save_image)
         input_layout.addWidget(self.input_field)
         layout.addLayout(input_layout)
 
@@ -83,55 +98,51 @@ class LabelingTool(QMainWindow):
         layout.addWidget(self.status_label)
 
         # Initial Fetch
-        self.fetch_image()
+        QTimer.singleShot(100, self.fetch_image) # Slight delay to let UI show
 
     def set_controls_enabled(self, enabled):
         self.fetch_btn.setEnabled(enabled)
         self.save_btn.setEnabled(enabled)
         self.input_field.setEnabled(enabled)
+        self.source_combo.setEnabled(enabled)
         if enabled:
             self.input_field.setFocus()
             self.input_field.selectAll()
 
     def fetch_image(self):
         try:
-            # Disable controls during fetch/wait
             self.set_controls_enabled(False)
-
-            # Generate URL with timestamp
-            # Format: Thu Feb 12 2026 15:16:32 GMT+0800 (China Standard Time)
-            now = datetime.now()
-            # Simple approximation of the format
-            date_str = now.strftime(
-                "%a %b %d %Y %H:%M:%S GMT+0800 (China Standard Time)"
-            )
-            url = f"http://192.168.1.230:10085/phis/app/login/voCode?data={date_str}"
-
-            self.status_label.setText("Fetching...")
+            source_label = self.source_combo.currentText()
+            source_key = self.source_map.get(source_label)
+            
+            self.status_label.setText(f"Fetching ({source_label})...")
             QApplication.processEvents()
 
-            response = requests.get(url, timeout=5)
-            if response.status_code == 200:
-                self.current_image_data = response.content
+            # Use SessionManager to fetch
+            try:
+                response = self.session_manager.fetch_captcha(source_key)
+                
+                if response.status_code == 200:
+                    self.current_image_data = response.content
+                    
+                    pixmap = QPixmap()
+                    pixmap.loadFromData(self.current_image_data)
+                    self.image_label.setPixmap(pixmap.scaled(200, 60, Qt.KeepAspectRatio))
 
-                # Display Image
-                pixmap = QPixmap()
-                pixmap.loadFromData(self.current_image_data)
-                self.image_label.setPixmap(pixmap.scaled(200, 60, Qt.KeepAspectRatio))
-
-                # Predict
-                self.predict_label()
-                self.status_label.setText("Fetched. Wait...")
-
-                QTimer.singleShot(
-                    7000,
-                    lambda: [
-                        self.set_controls_enabled(True),
-                        self.status_label.setText("Ready."),
-                    ],
-                )
-            else:
-                self.status_label.setText(f"Error: {response.status_code}")
+                    # Predict logic (Assuming 'alphanumeric' key is for the model)
+                    if source_key == "alphanumeric":
+                        self.predict_label()
+                    else:
+                        self.input_field.clear()
+                        
+                    self.status_label.setText("Fetched. Wait...")
+                    QTimer.singleShot(500, lambda: [self.set_controls_enabled(True), self.status_label.setText("Ready.")])
+                else:
+                    self.status_label.setText(f"Error: {response.status_code}")
+                    self.set_controls_enabled(True)
+                    
+            except Exception as e:
+                self.status_label.setText(f"Network Error: {e}")
                 self.set_controls_enabled(True)
 
         except Exception as e:
@@ -141,75 +152,56 @@ class LabelingTool(QMainWindow):
     def predict_label(self):
         if not self.solver or not self.current_image_data:
             return
-
         try:
-            # Save to temp file for solver
             temp_path = "temp_labeling.jpeg"
             with open(temp_path, "wb") as f:
                 f.write(self.current_image_data)
-
             pred = self.solver.solve(temp_path)
             self.input_field.setText(pred)
-
-            # Clean up
             if os.path.exists(temp_path):
                 os.remove(temp_path)
-
         except Exception as e:
             print(f"Prediction error: {e}")
 
     def save_image(self):
-        # Disable controls immediately
         self.set_controls_enabled(False)
-
         label = self.input_field.text().strip().upper()
-        if len(label) != 4:
-            self.status_label.setText("Label must be 4 characters!")
-            self.set_controls_enabled(True)
-            return
+        
+        source_label = self.source_combo.currentText()
+        source_key = self.source_map.get(source_label)
+        
+        # Basic validation
+        if len(label) < 1:
+             self.status_label.setText("Label cannot be empty!")
+             self.set_controls_enabled(True)
+             return
 
         if not self.current_image_data:
             self.set_controls_enabled(True)
             return
 
-        # Determine target directory
-        target_dir = self.test_dir if self.save_test_cb.isChecked() else self.raw_dir
+        if self.save_test_cb.isChecked():
+            target_dir = self.test_dir
+        else:
+            target_dir = self.session_manager.get_save_dir(source_key)
+            if not os.path.exists(target_dir):
+                os.makedirs(target_dir)
 
-        # Check if file exists, append suffix if needed
         base_name = label
         filename = f"{base_name}.jpeg"
         save_path = os.path.join(target_dir, filename)
-
+        
         counter = 1
         while os.path.exists(save_path):
             filename = f"{base_name}_{counter}.jpeg"
             save_path = os.path.join(target_dir, filename)
             counter += 1
-
+        
         try:
             with open(save_path, "wb") as f:
                 f.write(self.current_image_data)
-            self.status_label.setText(f"Saved {filename}. Wait...")
-
-            # Auto fetch next after delay
-            # We chain the delay: Wait 500ms -> Fetch -> (Fetch waits 500ms)
-            # Or just fetch immediately?
-            # User wants mandatory wait.
-            # If we fetch immediately, fetch_image will trigger ITS OWN wait.
-            # So we just call fetch_image after 500ms?
-            # Or call fetch_image immediately, and let it handle the UI lock?
-            # But fetch_image starts by locking UI.
-            # So if we are locked here, we can just call fetch_image inside the timer?
-
+            self.status_label.setText(f"Saved {filename} to {target_dir}. Wait...")
             QTimer.singleShot(500, lambda: self.fetch_image())
-
         except Exception as e:
             self.status_label.setText(f"Save Error: {e}")
             self.set_controls_enabled(True)
-
-
-if __name__ == "__main__":
-    app = QApplication(sys.argv)
-    window = LabelingTool()
-    window.show()
-    sys.exit(app.exec_())
