@@ -141,7 +141,7 @@ def collate_fn(batch):
     return images, targets, target_lengths
 
 
-def train_fixed():
+def train_fixed(progress_callback=None):
     # Strong augmentation
     train_transform = transforms.Compose(
         [
@@ -191,8 +191,13 @@ def train_fixed():
                 optimizer.step()
 
                 running_loss += loss.item()
+            
+            avg_loss = running_loss / len(dataloader)
+            print(f"Epoch {epoch + 1} - Loss: {avg_loss:.4f}")
 
-            print(f"Epoch {epoch + 1} - Loss: {running_loss / len(dataloader):.4f}")
+            if progress_callback:
+                progress_callback(epoch + 1, avg_loss, model)
+
     except KeyboardInterrupt:
         print("\nTraining interrupted by user. Saving model...")
 
