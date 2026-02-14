@@ -58,10 +58,11 @@ class ONNXSolver:
         if MODEL_BYTES is not None:
             model_source = MODEL_BYTES
 
-                # Select Vocabulary based on Injected Type
-                if VOCAB_TYPE == "math":
-                     self.chars = sorted(list("012345678+-=?"))
-                else:            self.chars = sorted(list("23456789ABCDEFGHJKLMNPQRSTUVWXYZ"))
+        # Select Vocabulary based on Injected Type
+        if VOCAB_TYPE == "math":
+            self.chars = sorted(list("012345678+-=?"))
+        else:
+            self.chars = sorted(list("23456789ABCDEFGHJKLMNPQRSTUVWXYZ"))
 
         self.classes = ["-"] + self.chars
         self.idx_to_char = {i: c for i, c in enumerate(self.classes)}
@@ -70,7 +71,7 @@ class ONNXSolver:
             self.ort_session = ort.InferenceSession(model_source)
             self.input_name = self.ort_session.get_inputs()[0].name
         except Exception as e:
-            # print(f"Error loading model: {e}")
+            print(f"Error loading model: {e}")
             self.ort_session = None
 
     def solve(self, img_source):
@@ -103,7 +104,31 @@ class ONNXSolver:
                 res.append(self.idx_to_char[idx])
             prev = idx
 
-        return "".join(res)
+        result_str = "".join(res)
+
+        if VOCAB_TYPE == "math":
+            try:
+                # Clean expression
+                expr = result_str.replace("=", "").replace("?", "")
+                # Simple and safe eval (only allow 0-9, +, -)
+                allowed = set("0123456789+-")
+                if all(c in allowed for c in expr):
+                    return str(eval(expr))
+            except Exception:
+                pass
+
+        return result_str
+
+
+def solve(source):
+    """
+    Top-level helper to solve captcha from path (str) or bytes.
+    """
+    if isinstance(source, bytes):
+        source = io.BytesIO(source)
+
+    solver = ONNXSolver()
+    return solver.solve(source)
 
 
 if __name__ == "__main__":
