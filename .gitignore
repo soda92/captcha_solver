@@ -3,6 +3,7 @@
 /test_images
 /templates
 
+/num_test_images
 /synthetic_captchas
 
 /*.jpeg
@@ -213,3 +214,4 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+config.toml

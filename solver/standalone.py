@@ -3,9 +3,9 @@ from PIL import Image
 import onnxruntime as ort
 import sys
 import io
-import os
 
 MODEL_BYTES = None
+VOCAB_TYPE = "alphanumeric"
 
 
 class ImgUtil:
@@ -14,24 +14,40 @@ class ImgUtil:
 
     def preprocess(self, img_source):
         """
-        Standardize image: Grayscale -> Adaptive Threshold -> Resize to Fixed Size (100x32).
-        No border cleaning or segmentation.
+        Standardize image: Grayscale -> Adaptive Threshold -> Resize (Preserving Aspect Ratio).
         """
         img = Image.open(img_source).convert("L")
 
         # Adaptive Thresholding
         hist = img.histogram()
-        # Find the most common pixel value (Background)
         bg_color = hist.index(max(hist))
-        # Set threshold slightly below background (Capture faint text)
         threshold = max(bg_color - 10, 50)
 
         img = img.point(lambda p: 255 if p > threshold else 0)
 
-        # Resize to fixed size for CRNN (100x32)
-        img = img.resize(self.img_size, Image.Resampling.NEAREST)
+        # Resize preserving aspect ratio
+        target_w, target_h = self.img_size
+        w, h = img.size
 
-        return img
+        # Scale to fixed height
+        scale = target_h / h
+        new_w = int(w * scale)
+        new_h = target_h
+
+        img = img.resize((new_w, new_h), Image.Resampling.NEAREST)
+
+        # Create canvas
+        new_img = Image.new("L", (target_w, target_h), 255)  # White background
+
+        # Paste (Center)
+        if new_w > target_w:
+            img = img.resize((target_w, target_h), Image.Resampling.NEAREST)
+            new_img.paste(img, (0, 0))
+        else:
+            x_pad = (target_w - new_w) // 2
+            new_img.paste(img, (x_pad, 0))
+
+        return new_img
 
 
 class ONNXSolver:
@@ -42,8 +58,12 @@ class ONNXSolver:
         if MODEL_BYTES is not None:
             model_source = MODEL_BYTES
 
-        # Classes: Blank (0) + 32 chars
-        self.chars = sorted(list("23456789ABCDEFGHJKLMNPQRSTUVWXYZ"))
+        # Select Vocabulary based on Injected Type
+        if VOCAB_TYPE == "math":
+            self.chars = sorted(list("012345678+-=?"))
+        else:
+            self.chars = sorted(list("23456789ABCDEFGHJKLMNPQRSTUVWXYZ"))
+
         self.classes = ["-"] + self.chars
         self.idx_to_char = {i: c for i, c in enumerate(self.classes)}
 
@@ -51,7 +71,7 @@ class ONNXSolver:
             self.ort_session = ort.InferenceSession(model_source)
             self.input_name = self.ort_session.get_inputs()[0].name
         except Exception as e:
-            # print(f"Error loading model: {e}") # Silent error or handle appropriately
+            print(f"Error loading model: {e}")
             self.ort_session = None
 
     def solve(self, img_source):
@@ -84,7 +104,31 @@ class ONNXSolver:
                 res.append(self.idx_to_char[idx])
             prev = idx
 
-        return "".join(res)
+        result_str = "".join(res)
+
+        if VOCAB_TYPE == "math":
+            try:
+                # Clean expression
+                expr = result_str.replace("=", "").replace("?", "")
+                # Simple and safe eval (only allow 0-9, +, -)
+                allowed = set("0123456789+-")
+                if all(c in allowed for c in expr):
+                    return str(eval(expr))
+            except Exception:
+                pass
+
+        return result_str
+
+
+def solve(source):
+    """
+    Top-level helper to solve captcha from path (str) or bytes.
+    """
+    if isinstance(source, bytes):
+        source = io.BytesIO(source)
+
+    solver = ONNXSolver()
+    return solver.solve(source)
 
 
 if __name__ == "__main__":

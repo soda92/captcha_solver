@@ -44,12 +44,18 @@ class CRNN(nn.Module):
 
 
 class MLSolver:
-    def __init__(self, model_path="model.pth"):
+    def __init__(self, model_path="model.pth", vocab_type="alphanumeric"):
         self.util = ImgUtil()
         self.model_path = model_path
         self.device = torch.device("cpu")
-        # Classes + Blank (index 0)
-        self.chars = sorted(list("23456789ABCDEFGHJKLMNPQRSTUVWXYZ"))
+
+        # Define vocabulary
+        if vocab_type == "math":
+            # 0-8, +, -, =, ? (No 9)
+            self.chars = sorted(list("012345678+-=?"))
+        else:  # Default Alphanumeric
+            self.chars = sorted(list("23456789ABCDEFGHJKLMNPQRSTUVWXYZ"))
+
         self.classes = ["-"] + self.chars  # Blank at 0
         self.char_to_idx = {c: i for i, c in enumerate(self.classes)}
         self.idx_to_char = {i: c for c, i in self.char_to_idx.items()}
@@ -80,3 +86,27 @@ class MLSolver:
                 res.append(self.idx_to_char[idx])
             prev = idx
         return "".join(res)
+
+    def solve(self, img_source):
+        """
+        Solve captcha from file path or file-like object.
+        """
+        img = self.util.preprocess(img_source)
+        # Convert to tensor: (1, 1, 32, 100)
+        import torchvision.transforms as transforms
+
+        tf = transforms.ToTensor()
+        img_tensor = tf(img).unsqueeze(0).to(self.device)
+
+        with torch.no_grad():
+            preds = self.model(img_tensor)
+
+        return self.decode(preds)
+
+    def solve_bytes(self, image_bytes):
+        """
+        Solve captcha from bytes.
+        """
+        import io
+
+        return self.solve(io.BytesIO(image_bytes))

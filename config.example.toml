@@ -1,0 +1,15 @@
+# Captcha Source Configurations
+
+[sources]
+
+[sources.alphanumeric]
+label = "Alphanumeric"
+# Uses JS Date.toString() format for {timestamp_js}
+captcha_url = "http://192.168.1.230:10085/XXX/voCode?data={timestamp_js}"
+
+[sources.math]
+label = "Math"
+# Uses milliseconds for {timestamp_ms}
+captcha_url = "http://example.com:7090/pm-oauth/random/code?type=1&t={timestamp_ms}"
+login_url = "http://example.com:7090/pm-oauth/oauth/login"
+save_dir = "num_captchas"

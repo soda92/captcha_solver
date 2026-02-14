@@ -1,0 +1,2 @@
+[files]
+ignore = ["labeling_tool/gui.py"]
