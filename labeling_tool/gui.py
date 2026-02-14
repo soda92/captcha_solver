@@ -1,4 +1,6 @@
 import os
+import time
+from datetime import datetime
 from PySide2.QtWidgets import (
     QMainWindow,
     QWidget,
@@ -9,13 +11,12 @@ from PySide2.QtWidgets import (
     QPushButton,
     QCheckBox,
     QComboBox,
-    QApplication,
+    QApplication
 )
 from PySide2.QtGui import QPixmap
 from PySide2.QtCore import Qt, QTimer
 from solver.onnx_solver import ONNXSolver
 from labeling_tool.session_manager import SessionManager
-
 
 class LabelingTool(QMainWindow):
     def __init__(self):
@@ -57,6 +58,7 @@ class LabelingTool(QMainWindow):
         top_layout.addWidget(QLabel("Source:"))
         self.source_combo = QComboBox()
         self.source_combo.addItems(list(self.source_map.keys()))
+        self.source_combo.currentIndexChanged.connect(self.on_source_changed)
         top_layout.addWidget(self.source_combo)
         layout.addLayout(top_layout)
 
@@ -96,8 +98,22 @@ class LabelingTool(QMainWindow):
         self.status_label = QLabel("Ready")
         layout.addWidget(self.status_label)
 
+        # Restore State
+        self.restore_selection()
+
         # Initial Fetch
-        QTimer.singleShot(100, self.fetch_image)  # Slight delay to let UI show
+        QTimer.singleShot(100, self.fetch_image) # Slight delay to let UI show
+
+    def restore_selection(self):
+        last_source = self.session_manager.get_last_source()
+        if last_source:
+            index = self.source_combo.findText(last_source)
+            if index >= 0:
+                self.source_combo.setCurrentIndex(index)
+
+    def on_source_changed(self):
+        self.session_manager.set_last_source(self.source_combo.currentText())
+        self.fetch_image()
 
     def set_controls_enabled(self, enabled):
         self.fetch_btn.setEnabled(enabled)
@@ -113,6 +129,11 @@ class LabelingTool(QMainWindow):
             self.set_controls_enabled(False)
             source_label = self.source_combo.currentText()
             source_key = self.source_map.get(source_label)
+            
+            if not source_key:
+                # Fallback or empty
+                self.set_controls_enabled(True)
+                return
 
             self.status_label.setText(f"Fetching ({source_label})...")
             QApplication.processEvents()
@@ -120,34 +141,25 @@ class LabelingTool(QMainWindow):
             # Use SessionManager to fetch
             try:
                 response = self.session_manager.fetch_captcha(source_key)
-
+                
                 if response.status_code == 200:
                     self.current_image_data = response.content
-
+                    
                     pixmap = QPixmap()
                     pixmap.loadFromData(self.current_image_data)
-                    self.image_label.setPixmap(
-                        pixmap.scaled(200, 60, Qt.KeepAspectRatio)
-                    )
+                    self.image_label.setPixmap(pixmap.scaled(200, 60, Qt.KeepAspectRatio))
 
-                    # Predict logic (Assuming 'alphanumeric' key is for the model)
                     if source_key == "alphanumeric":
                         self.predict_label()
                     else:
                         self.input_field.clear()
-
+                        
                     self.status_label.setText("Fetched. Wait...")
-                    QTimer.singleShot(
-                        500,
-                        lambda: [
-                            self.set_controls_enabled(True),
-                            self.status_label.setText("Ready."),
-                        ],
-                    )
+                    QTimer.singleShot(500, lambda: [self.set_controls_enabled(True), self.status_label.setText("Ready.")])
                 else:
                     self.status_label.setText(f"Error: {response.status_code}")
                     self.set_controls_enabled(True)
-
+                    
             except Exception as e:
                 self.status_label.setText(f"Network Error: {e}")
                 self.set_controls_enabled(True)
@@ -173,15 +185,15 @@ class LabelingTool(QMainWindow):
     def save_image(self):
         self.set_controls_enabled(False)
         label = self.input_field.text().strip().upper()
-
+        
         source_label = self.source_combo.currentText()
         source_key = self.source_map.get(source_label)
-
+        
         # Basic validation
         if len(label) < 1:
-            self.status_label.setText("Label cannot be empty!")
-            self.set_controls_enabled(True)
-            return
+             self.status_label.setText("Label cannot be empty!")
+             self.set_controls_enabled(True)
+             return
 
         if not self.current_image_data:
             self.set_controls_enabled(True)
@@ -197,13 +209,13 @@ class LabelingTool(QMainWindow):
         base_name = label
         filename = f"{base_name}.jpeg"
         save_path = os.path.join(target_dir, filename)
-
+        
         counter = 1
         while os.path.exists(save_path):
             filename = f"{base_name}_{counter}.jpeg"
             save_path = os.path.join(target_dir, filename)
             counter += 1
-
+        
         try:
             with open(save_path, "wb") as f:
                 f.write(self.current_image_data)

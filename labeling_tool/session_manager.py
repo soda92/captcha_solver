@@ -1,12 +1,14 @@
 import requests
 import time
 import tomli
+import tomli_w
 import os
 from datetime import datetime
 
 
 class SessionManager:
     def __init__(self, config_path="config.toml"):
+        self.config_path = config_path
         self.session = requests.Session()
         self.session.trust_env = False
         self.session.headers.update(
@@ -23,10 +25,19 @@ class SessionManager:
                 print(f"Config {path} not found, using config.example.toml")
                 path = "config.example.toml"
             else:
-                raise FileNotFoundError(f"Config file {path} not found.")
+                # If neither exists, start empty (though this might break things)
+                return {}
 
         with open(path, "rb") as f:
             return tomli.load(f)
+
+    def save_config(self):
+        try:
+            # Always save to the target path (e.g. config.toml), even if we loaded from example
+            with open(self.config_path, "wb") as f:
+                tomli_w.dump(self.config, f)
+        except Exception as e:
+            print(f"Failed to save config: {e}")
 
     def get_sources(self):
         """Returns a dict of label -> key"""
@@ -36,6 +47,13 @@ class SessionManager:
                 label = conf.get("label", key)
                 sources[label] = key
         return sources
+
+    def get_last_source(self):
+        return self.config.get("last_source")
+
+    def set_last_source(self, source_label):
+        self.config["last_source"] = source_label
+        self.save_config()
 
     def ensure_login(self, source_key):
         conf = self.config["sources"].get(source_key)
