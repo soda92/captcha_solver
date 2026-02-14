@@ -44,12 +44,19 @@ class CRNN(nn.Module):
 
 
 class MLSolver:
-    def __init__(self, model_path="model.pth"):
+    def __init__(self, model_path="model.pth", vocab_type="alphanumeric"):
         self.util = ImgUtil()
         self.model_path = model_path
         self.device = torch.device("cpu")
-        # Classes + Blank (index 0)
-        self.chars = sorted(list("23456789ABCDEFGHJKLMNPQRSTUVWXYZ"))
+        
+        # Define vocabulary
+        if vocab_type == "math":
+             # 0-9, +, -, =, ?
+             self.chars = sorted(list("0123456789+-=?"))
+        else:
+             # Default Alphanumeric
+             self.chars = sorted(list("23456789ABCDEFGHJKLMNPQRSTUVWXYZ"))
+             
         self.classes = ["-"] + self.chars  # Blank at 0
         self.char_to_idx = {c: i for i, c in enumerate(self.classes)}
         self.idx_to_char = {i: c for c, i in self.char_to_idx.items()}
