@@ -19,6 +19,12 @@
                 "--train",
                 "math"
             ]
+        },
+        {
+            "name": "GUI trainer",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/trainer/gui.py",
         }
     ]
 }

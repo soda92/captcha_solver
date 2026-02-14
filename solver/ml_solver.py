@@ -86,3 +86,25 @@ class MLSolver:
                 res.append(self.idx_to_char[idx])
             prev = idx
         return "".join(res)
+
+    def solve(self, img_source):
+        """
+        Solve captcha from file path or file-like object.
+        """
+        img = self.util.preprocess(img_source)
+        # Convert to tensor: (1, 1, 32, 100)
+        import torchvision.transforms as transforms
+        tf = transforms.ToTensor()
+        img_tensor = tf(img).unsqueeze(0).to(self.device)
+
+        with torch.no_grad():
+            preds = self.model(img_tensor)
+        
+        return self.decode(preds)
+
+    def solve_bytes(self, image_bytes):
+        """
+        Solve captcha from bytes.
+        """
+        import io
+        return self.solve(io.BytesIO(image_bytes))

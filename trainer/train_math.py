@@ -196,7 +196,10 @@ def train_fixed(progress_callback=None):
             print(f"Epoch {epoch + 1} - Loss: {avg_loss:.4f}")
 
             if progress_callback:
-                progress_callback(epoch + 1, avg_loss, model)
+                should_continue = progress_callback(epoch + 1, avg_loss, model)
+                if should_continue is False:
+                    print("Stopping requested by callback.")
+                    break
 
     except KeyboardInterrupt:
         print("\nTraining interrupted by user. Saving model...")
