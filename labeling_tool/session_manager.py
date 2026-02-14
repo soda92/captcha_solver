@@ -4,12 +4,16 @@ import tomli
 import os
 from datetime import datetime
 
+
 class SessionManager:
     def __init__(self, config_path="config.toml"):
         self.session = requests.Session()
-        self.session.headers.update({
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-        })
+        self.session.trust_env = False
+        self.session.headers.update(
+            {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            }
+        )
         self.config = self._load_config(config_path)
         self.visited_login = set()
 
@@ -20,7 +24,7 @@ class SessionManager:
                 path = "config.example.toml"
             else:
                 raise FileNotFoundError(f"Config file {path} not found.")
-                
+
         with open(path, "rb") as f:
             return tomli.load(f)
 
@@ -35,8 +39,9 @@ class SessionManager:
 
     def ensure_login(self, source_key):
         conf = self.config["sources"].get(source_key)
-        if not conf: return
-        
+        if not conf:
+            return
+
         login_url = conf.get("login_url")
         if login_url and source_key not in self.visited_login:
             print(f"Initializing session for {source_key}: Visiting {login_url}...")
@@ -50,20 +55,22 @@ class SessionManager:
 
     def fetch_captcha(self, source_key):
         self.ensure_login(source_key)
-        
+
         conf = self.config["sources"].get(source_key)
         if not conf:
             raise ValueError(f"Unknown source: {source_key}")
-            
+
         url_template = conf["captcha_url"]
-        
+
         # Generate Timestamps
         now = datetime.now()
         ts_js = now.strftime("%a %b %d %Y %H:%M:%S GMT+0800 (China Standard Time)")
         ts_ms = int(time.time() * 1000)
-        
-        url = url_template.replace("{timestamp_js}", ts_js).replace("{timestamp_ms}", str(ts_ms))
-        
+
+        url = url_template.replace("{timestamp_js}", ts_js).replace(
+            "{timestamp_ms}", str(ts_ms)
+        )
+
         return self.session.get(url, timeout=10)
 
     def get_save_dir(self, source_key):

@@ -3,7 +3,6 @@ from PIL import Image
 import onnxruntime as ort
 import sys
 import io
-import os
 
 MODEL_BYTES = None
 
@@ -50,7 +49,7 @@ class ONNXSolver:
         try:
             self.ort_session = ort.InferenceSession(model_source)
             self.input_name = self.ort_session.get_inputs()[0].name
-        except Exception as e:
+        except Exception:
             # print(f"Error loading model: {e}") # Silent error or handle appropriately
             self.ort_session = None
 

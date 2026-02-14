@@ -3,7 +3,7 @@ from solver.ml_solver import CRNN, MLSolver
 
 # 1. Load Model
 model_path = "model.pth"
-solver = MLSolver(model_path) # Helper to get class count
+solver = MLSolver(model_path)  # Helper to get class count
 # CRNN input is fixed height 32, variable width 100 (for 4 chars)
 num_classes = len(solver.classes)
 model = CRNN(num_classes)
@@ -21,9 +21,9 @@ torch.onnx.export(
     dummy_input,
     output_path,
     verbose=True,
-    input_names=['input'],
-    output_names=['output'],
-    dynamic_axes={'input': {0: 'batch_size'}, 'output': {1: 'batch_size'}}
+    input_names=["input"],
+    output_names=["output"],
+    dynamic_axes={"input": {0: "batch_size"}, "output": {1: "batch_size"}},
 )
 
 print(f"Model exported to {output_path}")
