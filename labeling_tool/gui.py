@@ -38,14 +38,21 @@ class LabelingTool(QMainWindow):
         self.session_manager = SessionManager()
         self.source_map = self.session_manager.get_sources()
 
-        # Model
-        self.solver = None
+        # Load Models
+        self.solvers = {}
         if os.path.exists("model.onnx"):
             try:
-                self.solver = ONNXSolver("model.onnx")
-                print("Model loaded.")
+                self.solvers["alphanumeric"] = ONNXSolver("model.onnx", vocab_type="alphanumeric")
+                print("Alphanumeric Model loaded.")
             except Exception as e:
-                print(f"Error loading model: {e}")
+                print(f"Error loading alphanumeric model: {e}")
+        
+        if os.path.exists("model_math.onnx"):
+            try:
+                self.solvers["math"] = ONNXSolver("model_math.onnx", vocab_type="math")
+                print("Math Model loaded.")
+            except Exception as e:
+                print(f"Error loading math model: {e}")
 
         # Current Image Data
         self.current_image_data = None
@@ -55,13 +62,17 @@ class LabelingTool(QMainWindow):
         self.setCentralWidget(central_widget)
         layout = QVBoxLayout(central_widget)
 
-        # Top Controls (Source Selection)
+        # Top Controls (Source Selection & Count)
         top_layout = QHBoxLayout()
         top_layout.addWidget(QLabel("Source:"))
         self.source_combo = QComboBox()
         self.source_combo.addItems(list(self.source_map.keys()))
         self.source_combo.currentIndexChanged.connect(self.on_source_changed)
         top_layout.addWidget(self.source_combo)
+        
+        self.count_label = QLabel("Count: 0")
+        top_layout.addWidget(self.count_label)
+        
         layout.addLayout(top_layout)
 
         # Image Display
@@ -102,6 +113,7 @@ class LabelingTool(QMainWindow):
 
         # Restore State
         self.restore_selection()
+        self.update_count()
 
         # Initial Fetch
         QTimer.singleShot(100, self.fetch_image)  # Slight delay to let UI show
@@ -115,7 +127,19 @@ class LabelingTool(QMainWindow):
 
     def on_source_changed(self):
         self.session_manager.set_last_source(self.source_combo.currentText())
+        self.update_count()
         self.fetch_image()
+        
+    def update_count(self):
+        source_label = self.source_combo.currentText()
+        source_key = self.source_map.get(source_label)
+        target_dir = self.session_manager.get_save_dir(source_key)
+        
+        count = 0
+        if os.path.exists(target_dir):
+            count = len([name for name in os.listdir(target_dir) if os.path.isfile(os.path.join(target_dir, name))])
+        
+        self.count_label.setText(f"Count: {count}")
 
     def set_controls_enabled(self, enabled):
         self.fetch_btn.setEnabled(enabled)
@@ -153,10 +177,7 @@ class LabelingTool(QMainWindow):
                         pixmap.scaled(200, 60, Qt.KeepAspectRatio)
                     )
 
-                    if source_key == "alphanumeric":
-                        self.predict_label()
-                    else:
-                        self.input_field.clear()
+                    self.predict_label(source_key)
 
                     self.status_label.setText("Fetched. Wait...")
                     QTimer.singleShot(
@@ -178,19 +199,23 @@ class LabelingTool(QMainWindow):
             self.status_label.setText(f"Error: {e}")
             self.set_controls_enabled(True)
 
-    def predict_label(self):
-        if not self.solver or not self.current_image_data:
+    def predict_label(self, source_key):
+        solver = self.solvers.get(source_key)
+        if not solver or not self.current_image_data:
+            self.input_field.clear()
             return
+            
         try:
             temp_path = "temp_labeling.jpeg"
             with open(temp_path, "wb") as f:
                 f.write(self.current_image_data)
-            pred = self.solver.solve(temp_path)
+            pred = solver.solve(temp_path)
             self.input_field.setText(pred)
             if os.path.exists(temp_path):
                 os.remove(temp_path)
         except Exception as e:
             print(f"Prediction error: {e}")
+            self.input_field.clear()
 
     def save_image(self):
         self.set_controls_enabled(False)
@@ -237,6 +262,7 @@ class LabelingTool(QMainWindow):
             with open(save_path, "wb") as f:
                 f.write(self.current_image_data)
             self.status_label.setText(f"Saved {filename} to {target_dir}. Wait...")
+            self.update_count() # Update count after save
             QTimer.singleShot(500, lambda: self.fetch_image())
         except Exception as e:
             self.status_label.setText(f"Save Error: {e}")
