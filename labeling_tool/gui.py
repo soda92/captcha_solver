@@ -15,6 +15,7 @@ from PySide2.QtGui import QPixmap
 from PySide2.QtCore import Qt, QTimer
 from solver.onnx_solver import ONNXSolver
 from labeling_tool.session_manager import SessionManager
+from typing import Dict
 
 
 class LabelingTool(QMainWindow):
@@ -39,14 +40,16 @@ class LabelingTool(QMainWindow):
         self.source_map = self.session_manager.get_sources()
 
         # Load Models
-        self.solvers = {}
+        self.solvers: Dict[str, ONNXSolver] = {}
         if os.path.exists("model.onnx"):
             try:
-                self.solvers["alphanumeric"] = ONNXSolver("model.onnx", vocab_type="alphanumeric")
+                self.solvers["alphanumeric"] = ONNXSolver(
+                    "model.onnx", vocab_type="alphanumeric"
+                )
                 print("Alphanumeric Model loaded.")
             except Exception as e:
                 print(f"Error loading alphanumeric model: {e}")
-        
+
         if os.path.exists("model_math.onnx"):
             try:
                 self.solvers["math"] = ONNXSolver("model_math.onnx", vocab_type="math")
@@ -69,10 +72,10 @@ class LabelingTool(QMainWindow):
         self.source_combo.addItems(list(self.source_map.keys()))
         self.source_combo.currentIndexChanged.connect(self.on_source_changed)
         top_layout.addWidget(self.source_combo)
-        
+
         self.count_label = QLabel("Count: 0")
         top_layout.addWidget(self.count_label)
-        
+
         layout.addLayout(top_layout)
 
         # Image Display
@@ -129,16 +132,22 @@ class LabelingTool(QMainWindow):
         self.session_manager.set_last_source(self.source_combo.currentText())
         self.update_count()
         self.fetch_image()
-        
+
     def update_count(self):
         source_label = self.source_combo.currentText()
         source_key = self.source_map.get(source_label)
         target_dir = self.session_manager.get_save_dir(source_key)
-        
+
         count = 0
         if os.path.exists(target_dir):
-            count = len([name for name in os.listdir(target_dir) if os.path.isfile(os.path.join(target_dir, name))])
-        
+            count = len(
+                [
+                    name
+                    for name in os.listdir(target_dir)
+                    if os.path.isfile(os.path.join(target_dir, name))
+                ]
+            )
+
         self.count_label.setText(f"Count: {count}")
 
     def set_controls_enabled(self, enabled):
@@ -204,12 +213,13 @@ class LabelingTool(QMainWindow):
         if not solver or not self.current_image_data:
             self.input_field.clear()
             return
-            
+
         try:
             temp_path = "temp_labeling.jpeg"
             with open(temp_path, "wb") as f:
                 f.write(self.current_image_data)
             pred = solver.solve(temp_path)
+            pred = pred.replace("=", "").replace("?", "")
             self.input_field.setText(pred)
             if os.path.exists(temp_path):
                 os.remove(temp_path)
@@ -262,7 +272,7 @@ class LabelingTool(QMainWindow):
             with open(save_path, "wb") as f:
                 f.write(self.current_image_data)
             self.status_label.setText(f"Saved {filename} to {target_dir}. Wait...")
-            self.update_count() # Update count after save
+            self.update_count()  # Update count after save
             QTimer.singleShot(500, lambda: self.fetch_image())
         except Exception as e:
             self.status_label.setText(f"Save Error: {e}")
