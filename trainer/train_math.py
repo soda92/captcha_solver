@@ -182,7 +182,9 @@ def train_fixed(progress_callback=None):
                 preds = model(images)
 
                 batch_size = images.size(0)
-                input_lengths = torch.full((batch_size,), preds.size(0), dtype=torch.long)
+                input_lengths = torch.full(
+                    (batch_size,), preds.size(0), dtype=torch.long
+                )
 
                 loss = criterion(preds, targets, input_lengths, target_lengths)
 
@@ -191,7 +193,7 @@ def train_fixed(progress_callback=None):
                 optimizer.step()
 
                 running_loss += loss.item()
-            
+
             avg_loss = running_loss / len(dataloader)
             print(f"Epoch {epoch + 1} - Loss: {avg_loss:.4f}")
 

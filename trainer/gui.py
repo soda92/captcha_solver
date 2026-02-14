@@ -1,8 +1,16 @@
 import sys
 import matplotlib
-matplotlib.use('Qt5Agg')
-from PySide2.QtWidgets import (QApplication, QMainWindow, QVBoxLayout, QWidget, 
-                             QPushButton, QLabel, QHBoxLayout, QFrame)
+
+matplotlib.use("Qt5Agg")
+from PySide2.QtWidgets import (
+    QApplication,
+    QMainWindow,
+    QVBoxLayout,
+    QWidget,
+    QPushButton,
+    QLabel,
+    QHBoxLayout,
+)
 from PySide2.QtCore import QThread, Signal, Qt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
@@ -47,8 +55,9 @@ QPushButton#stopBtn:hover {
 }
 """
 
+
 class TrainingThread(QThread):
-    progress_signal = Signal(int, float, float) # epoch, loss, accuracy
+    progress_signal = Signal(int, float, float)  # epoch, loss, accuracy
     log_signal = Signal(str)
     finished_signal = Signal()
 
@@ -57,18 +66,21 @@ class TrainingThread(QThread):
         self.stop_requested = False
         self.solver_helper = MLSolver(model_path="", vocab_type="math")
         self.idx_to_char = self.solver_helper.idx_to_char
-        
+
         # Prepare Test Loader
         test_dir = "num_test_images"
         if not os.path.exists(test_dir):
             test_dir = "num_captchas"
-            
-        self.test_dataset = MathCaptchaDataset(test_dir, transform=None) 
+
+        self.test_dataset = MathCaptchaDataset(test_dir, transform=None)
         from torchvision import transforms
+
         self.test_transform = transforms.Compose([transforms.ToTensor()])
         self.test_dataset.transform = self.test_transform
-        
-        self.test_loader = DataLoader(self.test_dataset, batch_size=32, shuffle=False, collate_fn=collate_fn)
+
+        self.test_loader = DataLoader(
+            self.test_dataset, batch_size=32, shuffle=False, collate_fn=collate_fn
+        )
 
     def run(self):
         self.stop_requested = False
@@ -110,35 +122,37 @@ class TrainingThread(QThread):
         correct = 0
         total = 0
         device = next(model.parameters()).device
-        
+
         with torch.no_grad():
             for images, targets, target_lengths in self.test_loader:
                 images = images.to(device)
                 preds = model(images)
                 pred_strs = self.decode_batch(preds)
                 target_strs = self.decode_target(targets, target_lengths)
-                
+
                 for pred, target in zip(pred_strs, target_strs):
                     try:
                         p_clean = pred.replace("=", "").replace("?", "")
                         t_clean = target.replace("=", "").replace("?", "")
                         if p_clean == t_clean:
                             correct += 1
-                    except:
+                    except Exception as e:
+                        print(e)
                         pass
                     total += 1
-        
+
         model.train()
         return correct / total if total > 0 else 0
 
     def progress_callback(self, epoch, loss, model):
         if self.stop_requested:
             return False
-            
+
         acc = self.calculate_accuracy(model)
         self.progress_signal.emit(epoch, loss, acc)
         self.log_signal.emit(f"Epoch {epoch}: Loss={loss:.4f}, Acc={acc:.2%}")
         return True
+
 
 class TrainingWindow(QMainWindow):
     def __init__(self):
@@ -155,7 +169,7 @@ class TrainingWindow(QMainWindow):
         self.figure = Figure(figsize=(8, 5))
         self.canvas = FigureCanvas(self.figure)
         layout.addWidget(self.canvas)
-        
+
         self.ax1 = self.figure.add_subplot(111)
         self.ax2 = self.ax1.twinx()
         self.setup_plot()
@@ -168,17 +182,17 @@ class TrainingWindow(QMainWindow):
         # Controls (Bottom)
         controls_layout = QHBoxLayout()
         controls_layout.addStretch()
-        
+
         self.start_btn = QPushButton("Start Training")
         self.start_btn.clicked.connect(self.start_training)
         controls_layout.addWidget(self.start_btn)
-        
+
         self.stop_btn = QPushButton("Stop & Export")
         self.stop_btn.setObjectName("stopBtn")
         self.stop_btn.clicked.connect(self.stop_training)
         self.stop_btn.setEnabled(False)
         controls_layout.addWidget(self.stop_btn)
-        
+
         controls_layout.addStretch()
         layout.addLayout(controls_layout)
 
@@ -189,17 +203,19 @@ class TrainingWindow(QMainWindow):
 
     def setup_plot(self):
         self.ax1.set_xlabel("Epoch")
-        self.ax1.set_ylabel("Loss", color='b')
-        self.ax1.tick_params(axis='y', labelcolor='b')
-        
-        self.ax2.set_ylabel("Accuracy", color='g')
-        self.ax2.tick_params(axis='y', labelcolor='g')
+        self.ax1.set_ylabel("Loss", color="b")
+        self.ax1.tick_params(axis="y", labelcolor="b")
+
+        self.ax2.set_ylabel("Accuracy", color="g")
+        self.ax2.tick_params(axis="y", labelcolor="g")
         self.ax2.set_ylim(0, 1.05)
-        
-        self.line_loss, = self.ax1.plot([], [], 'b-', label="Loss")
-        self.line_acc, = self.ax2.plot([], [], 'g-', label="Accuracy")
-        
-        self.figure.legend(loc='upper right', bbox_to_anchor=(1,1), bbox_transform=self.ax1.transAxes)
+
+        (self.line_loss,) = self.ax1.plot([], [], "b-", label="Loss")
+        (self.line_acc,) = self.ax2.plot([], [], "g-", label="Accuracy")
+
+        self.figure.legend(
+            loc="upper right", bbox_to_anchor=(1, 1), bbox_transform=self.ax1.transAxes
+        )
 
     def start_training(self):
         self.start_btn.setEnabled(False)
@@ -207,14 +223,14 @@ class TrainingWindow(QMainWindow):
         self.losses = []
         self.accuracies = []
         self.epochs = []
-        
+
         self.ax1.cla()
         self.ax2.cla()
         # Re-setup because cla() clears everything including labels
-        self.ax2 = self.ax1.twinx() # Recreate twinx
+        self.ax2 = self.ax1.twinx()  # Recreate twinx
         self.setup_plot()
         self.canvas.draw()
-        
+
         self.thread.start()
 
     def stop_training(self):
@@ -241,15 +257,15 @@ class TrainingWindow(QMainWindow):
         self.epochs.append(epoch)
         self.losses.append(loss)
         self.accuracies.append(acc)
-        
+
         self.line_loss.set_data(self.epochs, self.losses)
         self.line_acc.set_data(self.epochs, self.accuracies)
-        
+
         self.ax1.relim()
         self.ax1.autoscale_view()
         self.ax2.relim()
         self.ax2.autoscale_view()
-        
+
         self.canvas.draw()
 
     def update_log(self, message):
@@ -260,18 +276,20 @@ class TrainingWindow(QMainWindow):
         if self.thread.isRunning():
             self.thread.request_stop()
             self.thread.wait()
-        
+
         # Ensure export happens on close if data exists
         if os.path.exists(MODEL_OUT):
-             self.export_model()
-             
+            self.export_model()
+
         event.accept()
+
 
 def main():
     app = QApplication(sys.argv)
     window = TrainingWindow()
     window.show()
     sys.exit(app.exec_())
+
 
 if __name__ == "__main__":
     main()

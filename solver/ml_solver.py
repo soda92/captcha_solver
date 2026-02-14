@@ -51,9 +51,9 @@ class MLSolver:
 
         # Define vocabulary
         if vocab_type == "math":
-                # 0-8, +, -, =, ? (No 9)
-                self.chars = sorted(list("012345678+-=?"))
-        else:            # Default Alphanumeric
+            # 0-8, +, -, =, ? (No 9)
+            self.chars = sorted(list("012345678+-=?"))
+        else:  # Default Alphanumeric
             self.chars = sorted(list("23456789ABCDEFGHJKLMNPQRSTUVWXYZ"))
 
         self.classes = ["-"] + self.chars  # Blank at 0
@@ -94,12 +94,13 @@ class MLSolver:
         img = self.util.preprocess(img_source)
         # Convert to tensor: (1, 1, 32, 100)
         import torchvision.transforms as transforms
+
         tf = transforms.ToTensor()
         img_tensor = tf(img).unsqueeze(0).to(self.device)
 
         with torch.no_grad():
             preds = self.model(img_tensor)
-        
+
         return self.decode(preds)
 
     def solve_bytes(self, image_bytes):
@@ -107,4 +108,5 @@ class MLSolver:
         Solve captcha from bytes.
         """
         import io
+
         return self.solve(io.BytesIO(image_bytes))
