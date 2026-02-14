@@ -14,24 +14,40 @@ class ImgUtil:
 
     def preprocess(self, img_source):
         """
-        Standardize image: Grayscale -> Adaptive Threshold -> Resize to Fixed Size (100x32).
-        No border cleaning or segmentation.
+        Standardize image: Grayscale -> Adaptive Threshold -> Resize (Preserving Aspect Ratio).
         """
         img = Image.open(img_source).convert("L")
 
         # Adaptive Thresholding
         hist = img.histogram()
-        # Find the most common pixel value (Background)
         bg_color = hist.index(max(hist))
-        # Set threshold slightly below background (Capture faint text)
         threshold = max(bg_color - 10, 50)
 
         img = img.point(lambda p: 255 if p > threshold else 0)
 
-        # Resize to fixed size for CRNN (100x32)
-        img = img.resize(self.img_size, Image.Resampling.NEAREST)
+        # Resize preserving aspect ratio
+        target_w, target_h = self.img_size
+        w, h = img.size
 
-        return img
+        # Scale to fixed height
+        scale = target_h / h
+        new_w = int(w * scale)
+        new_h = target_h
+
+        img = img.resize((new_w, new_h), Image.Resampling.NEAREST)
+
+        # Create canvas
+        new_img = Image.new("L", (target_w, target_h), 255)  # White background
+
+        # Paste (Center)
+        if new_w > target_w:
+            img = img.resize((target_w, target_h), Image.Resampling.NEAREST)
+            new_img.paste(img, (0, 0))
+        else:
+            x_pad = (target_w - new_w) // 2
+            new_img.paste(img, (x_pad, 0))
+
+        return new_img
 
 
 class ONNXSolver:
@@ -42,11 +58,10 @@ class ONNXSolver:
         if MODEL_BYTES is not None:
             model_source = MODEL_BYTES
 
-        # Select Vocabulary based on Injected Type
-        if VOCAB_TYPE == "math":
-            self.chars = sorted(list("0123456789+-=?"))
-        else:
-            self.chars = sorted(list("23456789ABCDEFGHJKLMNPQRSTUVWXYZ"))
+                # Select Vocabulary based on Injected Type
+                if VOCAB_TYPE == "math":
+                     self.chars = sorted(list("012345678+-=?"))
+                else:            self.chars = sorted(list("23456789ABCDEFGHJKLMNPQRSTUVWXYZ"))
 
         self.classes = ["-"] + self.chars
         self.idx_to_char = {i: c for i, c in enumerate(self.classes)}

@@ -51,10 +51,9 @@ class MLSolver:
 
         # Define vocabulary
         if vocab_type == "math":
-            # 0-9, +, -, =, ?
-            self.chars = sorted(list("0123456789+-=?"))
-        else:
-            # Default Alphanumeric
+                # 0-8, +, -, =, ? (No 9)
+                self.chars = sorted(list("012345678+-=?"))
+        else:            # Default Alphanumeric
             self.chars = sorted(list("23456789ABCDEFGHJKLMNPQRSTUVWXYZ"))
 
         self.classes = ["-"] + self.chars  # Blank at 0

@@ -9,8 +9,8 @@ from solver.utils import ImgUtil
 import os
 
 # Training Configuration
-OVERSAMPLE = 10  # Heavy oversampling for small dataset
-EPOCHS = 80
+OVERSAMPLE = 1
+EPOCHS = 100
 MODEL_OUT = "model_math.pth"
 DATA_DIR = "num_captchas"
 
