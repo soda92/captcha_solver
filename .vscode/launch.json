@@ -9,6 +9,16 @@
             "type": "debugpy",
             "request": "launch",
             "module": "labeling_tool"
+        },
+        {
+            "name": "math_train",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "trainer",
+            "args": [
+                "--train",
+                "math"
+            ]
         }
     ]
 }
