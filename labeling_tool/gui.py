@@ -1,6 +1,4 @@
 import os
-import time
-from datetime import datetime
 from PySide2.QtWidgets import (
     QMainWindow,
     QWidget,
@@ -11,12 +9,13 @@ from PySide2.QtWidgets import (
     QPushButton,
     QCheckBox,
     QComboBox,
-    QApplication
+    QApplication,
 )
 from PySide2.QtGui import QPixmap
 from PySide2.QtCore import Qt, QTimer
 from solver.onnx_solver import ONNXSolver
 from labeling_tool.session_manager import SessionManager
+
 
 class LabelingTool(QMainWindow):
     def __init__(self):
@@ -105,7 +104,7 @@ class LabelingTool(QMainWindow):
         self.restore_selection()
 
         # Initial Fetch
-        QTimer.singleShot(100, self.fetch_image) # Slight delay to let UI show
+        QTimer.singleShot(100, self.fetch_image)  # Slight delay to let UI show
 
     def restore_selection(self):
         last_source = self.session_manager.get_last_source()
@@ -132,7 +131,7 @@ class LabelingTool(QMainWindow):
             self.set_controls_enabled(False)
             source_label = self.source_combo.currentText()
             source_key = self.source_map.get(source_label)
-            
+
             if not source_key:
                 # Fallback or empty
                 self.set_controls_enabled(True)
@@ -144,25 +143,33 @@ class LabelingTool(QMainWindow):
             # Use SessionManager to fetch
             try:
                 response = self.session_manager.fetch_captcha(source_key)
-                
+
                 if response.status_code == 200:
                     self.current_image_data = response.content
-                    
+
                     pixmap = QPixmap()
                     pixmap.loadFromData(self.current_image_data)
-                    self.image_label.setPixmap(pixmap.scaled(200, 60, Qt.KeepAspectRatio))
+                    self.image_label.setPixmap(
+                        pixmap.scaled(200, 60, Qt.KeepAspectRatio)
+                    )
 
                     if source_key == "alphanumeric":
                         self.predict_label()
                     else:
                         self.input_field.clear()
-                        
+
                     self.status_label.setText("Fetched. Wait...")
-                    QTimer.singleShot(500, lambda: [self.set_controls_enabled(True), self.status_label.setText("Ready.")])
+                    QTimer.singleShot(
+                        500,
+                        lambda: [
+                            self.set_controls_enabled(True),
+                            self.status_label.setText("Ready."),
+                        ],
+                    )
                 else:
                     self.status_label.setText(f"Error: {response.status_code}")
                     self.set_controls_enabled(True)
-                    
+
             except Exception as e:
                 self.status_label.setText(f"Network Error: {e}")
                 self.set_controls_enabled(True)
@@ -188,15 +195,15 @@ class LabelingTool(QMainWindow):
     def save_image(self):
         self.set_controls_enabled(False)
         label = self.input_field.text().strip().upper()
-        
+
         source_label = self.source_combo.currentText()
         source_key = self.source_map.get(source_label)
-        
+
         # Basic validation
         if len(label) < 1:
-             self.status_label.setText("Label cannot be empty!")
-             self.set_controls_enabled(True)
-             return
+            self.status_label.setText("Label cannot be empty!")
+            self.set_controls_enabled(True)
+            return
 
         if not self.current_image_data:
             self.set_controls_enabled(True)
@@ -204,7 +211,7 @@ class LabelingTool(QMainWindow):
 
         # Determine target directory
         default_dir = self.session_manager.get_save_dir(source_key)
-        
+
         if self.save_test_cb.isChecked():
             # If default dir is the math dir, use math test dir
             if default_dir == self.num_dir:
@@ -219,13 +226,13 @@ class LabelingTool(QMainWindow):
         base_name = label
         filename = f"{base_name}.jpeg"
         save_path = os.path.join(target_dir, filename)
-        
+
         counter = 1
         while os.path.exists(save_path):
             filename = f"{base_name}_{counter}.jpeg"
             save_path = os.path.join(target_dir, filename)
             counter += 1
-        
+
         try:
             with open(save_path, "wb") as f:
                 f.write(self.current_image_data)

@@ -8,14 +8,14 @@ class ONNXSolver:
     def __init__(self, model_path="model.onnx", vocab_type="alphanumeric"):
         self.util = ImgUtil()
         self.model_path = model_path
-        
+
         if vocab_type == "math":
-             # 0-9, +, -, =, ?
-             self.chars = sorted(list("0123456789+-=?"))
+            # 0-9, +, -, =, ?
+            self.chars = sorted(list("0123456789+-=?"))
         else:
-             # Default Alphanumeric
-             self.chars = sorted(list("23456789ABCDEFGHJKLMNPQRSTUVWXYZ"))
-             
+            # Default Alphanumeric
+            self.chars = sorted(list("23456789ABCDEFGHJKLMNPQRSTUVWXYZ"))
+
         self.classes = ["-"] + self.chars
         self.idx_to_char = {i: c for i, c in enumerate(self.classes)}
 
