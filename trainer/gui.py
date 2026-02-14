@@ -1,7 +1,4 @@
 import sys
-import matplotlib
-
-matplotlib.use("Qt5Agg")
 from PySide2.QtWidgets import (
     QApplication,
     QMainWindow,
@@ -12,8 +9,8 @@ from PySide2.QtWidgets import (
     QHBoxLayout,
 )
 from PySide2.QtCore import QThread, Signal, Qt
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
-from matplotlib.figure import Figure
+from PySide2.QtCharts import QtCharts
+from PySide2.QtGui import QPainter
 import torch
 from torch.utils.data import DataLoader
 import os
@@ -136,8 +133,7 @@ class TrainingThread(QThread):
                         t_clean = target.replace("=", "").replace("?", "")
                         if p_clean == t_clean:
                             correct += 1
-                    except Exception as e:
-                        print(e)
+                    except Exception:
                         pass
                     total += 1
 
@@ -165,14 +161,47 @@ class TrainingWindow(QMainWindow):
         self.setCentralWidget(central_widget)
         layout = QVBoxLayout(central_widget)
 
-        # Plot
-        self.figure = Figure(figsize=(8, 5))
-        self.canvas = FigureCanvas(self.figure)
-        layout.addWidget(self.canvas)
+        # Chart Setup
+        self.chart = QtCharts.QChart()
+        self.chart.setTitle("Training Metrics")
+        self.chart.setAnimationOptions(QtCharts.QChart.SeriesAnimations)
 
-        self.ax1 = self.figure.add_subplot(111)
-        self.ax2 = self.ax1.twinx()
-        self.setup_plot()
+        self.loss_series = QtCharts.QLineSeries()
+        self.loss_series.setName("Loss")
+        self.loss_series.setColor(Qt.blue)
+        self.chart.addSeries(self.loss_series)
+
+        self.acc_series = QtCharts.QLineSeries()
+        self.acc_series.setName("Accuracy")
+        self.acc_series.setColor(Qt.green)
+        self.chart.addSeries(self.acc_series)
+
+        # Axes
+        self.axis_x = QtCharts.QValueAxis()
+        self.axis_x.setTitleText("Epoch")
+        self.axis_x.setLabelFormat("%d")
+        self.chart.addAxis(self.axis_x, Qt.AlignBottom)
+        self.loss_series.attachAxis(self.axis_x)
+        self.acc_series.attachAxis(self.axis_x)
+
+        self.axis_y_loss = QtCharts.QValueAxis()
+        self.axis_y_loss.setTitleText("Loss")
+        self.axis_y_loss.setLinePenColor(Qt.blue)
+        self.axis_y_loss.setLabelsColor(Qt.blue)
+        self.chart.addAxis(self.axis_y_loss, Qt.AlignLeft)
+        self.loss_series.attachAxis(self.axis_y_loss)
+
+        self.axis_y_acc = QtCharts.QValueAxis()
+        self.axis_y_acc.setTitleText("Accuracy")
+        self.axis_y_acc.setLinePenColor(Qt.green)
+        self.axis_y_acc.setLabelsColor(Qt.green)
+        self.axis_y_acc.setRange(0, 1.05)
+        self.chart.addAxis(self.axis_y_acc, Qt.AlignRight)
+        self.acc_series.attachAxis(self.axis_y_acc)
+
+        self.chart_view = QtCharts.QChartView(self.chart)
+        self.chart_view.setRenderHint(QPainter.Antialiasing)
+        layout.addWidget(self.chart_view)
 
         # Log
         self.log_label = QLabel("Ready")
@@ -201,35 +230,14 @@ class TrainingWindow(QMainWindow):
         self.thread.log_signal.connect(self.update_log)
         self.thread.finished_signal.connect(self.on_finished)
 
-    def setup_plot(self):
-        self.ax1.set_xlabel("Epoch")
-        self.ax1.set_ylabel("Loss", color="b")
-        self.ax1.tick_params(axis="y", labelcolor="b")
-
-        self.ax2.set_ylabel("Accuracy", color="g")
-        self.ax2.tick_params(axis="y", labelcolor="g")
-        self.ax2.set_ylim(0, 1.05)
-
-        (self.line_loss,) = self.ax1.plot([], [], "b-", label="Loss")
-        (self.line_acc,) = self.ax2.plot([], [], "g-", label="Accuracy")
-
-        self.figure.legend(
-            loc="upper right", bbox_to_anchor=(1, 1), bbox_transform=self.ax1.transAxes
-        )
-
     def start_training(self):
         self.start_btn.setEnabled(False)
         self.stop_btn.setEnabled(True)
-        self.losses = []
-        self.accuracies = []
-        self.epochs = []
 
-        self.ax1.cla()
-        self.ax2.cla()
-        # Re-setup because cla() clears everything including labels
-        self.ax2 = self.ax1.twinx()  # Recreate twinx
-        self.setup_plot()
-        self.canvas.draw()
+        self.loss_series.clear()
+        self.acc_series.clear()
+        self.axis_x.setRange(0, 10)  # Initial range
+        self.axis_y_loss.setRange(0, 5)  # Initial range
 
         self.thread.start()
 
@@ -254,19 +262,20 @@ class TrainingWindow(QMainWindow):
             self.log_label.setText(f"Export Error: {e}")
 
     def update_plot(self, epoch, loss, acc):
-        self.epochs.append(epoch)
-        self.losses.append(loss)
-        self.accuracies.append(acc)
+        self.loss_series.append(epoch, loss)
+        self.acc_series.append(epoch, acc)
 
-        self.line_loss.set_data(self.epochs, self.losses)
-        self.line_acc.set_data(self.epochs, self.accuracies)
+        # Adjust axes
+        self.axis_x.setRange(0, epoch + 1)
 
-        self.ax1.relim()
-        self.ax1.autoscale_view()
-        self.ax2.relim()
-        self.ax2.autoscale_view()
-
-        self.canvas.draw()
+        # Auto-scale Loss Y-Axis
+        current_max = self.axis_y_loss.max()
+        if loss > current_max:
+            self.axis_y_loss.setRange(0, loss * 1.1)
+        elif current_max > 5 and loss < current_max * 0.5:
+            # Zoom in if loss drops significantly
+            # Find max in recent history ideally, but simple approach:
+            pass
 
     def update_log(self, message):
         self.log_label.setText(message)
