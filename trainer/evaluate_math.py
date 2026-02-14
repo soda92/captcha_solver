@@ -38,6 +38,7 @@ def evaluate():
 
         pred_expr = solver.solve(str(f))
 
+        expr = ""
         # Calculate result
         try:
             # Clean expression (remove =?)
@@ -50,7 +51,7 @@ def evaluate():
             print(e)
             val = "Err"
 
-        is_match = pred_expr == expected
+        is_match = expr == expected
         status = "✅ OK" if is_match else "❌ FAIL"
 
         if is_match:

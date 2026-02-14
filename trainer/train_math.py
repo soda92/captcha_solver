@@ -9,7 +9,7 @@ from solver.utils import ImgUtil
 import os
 
 # Training Configuration
-OVERSAMPLE = 1
+OVERSAMPLE = 5
 EPOCHS = 100
 MODEL_OUT = "model_math.pth"
 DATA_DIR = "num_captchas"
@@ -35,6 +35,9 @@ class MathCaptchaDataset(Dataset):
 
             # The filenames might be like '8-5', '3+4'.
             # We treat the filename as the ground truth.
+
+            # Append =? to label because images contain it
+            label_str += "=?"
 
             try:
                 # Preprocess full image
@@ -168,27 +171,30 @@ def train_fixed():
 
     print(f"Training Math CRNN for {EPOCHS} epochs...")
 
-    for epoch in range(EPOCHS):
-        running_loss = 0.0
+    try:
+        for epoch in range(EPOCHS):
+            running_loss = 0.0
 
-        for images, targets, target_lengths in dataloader:
-            images = images.to(device)
-            targets = targets.to(device)
+            for images, targets, target_lengths in dataloader:
+                images = images.to(device)
+                targets = targets.to(device)
 
-            preds = model(images)
+                preds = model(images)
 
-            batch_size = images.size(0)
-            input_lengths = torch.full((batch_size,), preds.size(0), dtype=torch.long)
+                batch_size = images.size(0)
+                input_lengths = torch.full((batch_size,), preds.size(0), dtype=torch.long)
 
-            loss = criterion(preds, targets, input_lengths, target_lengths)
+                loss = criterion(preds, targets, input_lengths, target_lengths)
 
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
 
-            running_loss += loss.item()
+                running_loss += loss.item()
 
-        print(f"Epoch {epoch + 1} - Loss: {running_loss / len(dataloader):.4f}")
+            print(f"Epoch {epoch + 1} - Loss: {running_loss / len(dataloader):.4f}")
+    except KeyboardInterrupt:
+        print("\nTraining interrupted by user. Saving model...")
 
     torch.save(model.state_dict(), MODEL_OUT)
     print(f"Model saved to {MODEL_OUT}")
