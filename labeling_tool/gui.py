@@ -25,12 +25,15 @@ class LabelingTool(QMainWindow):
         self.raw_dir = "raw_captchas"
         self.num_dir = "num_captchas"
         self.test_dir = "test_images"
+        self.num_test_dir = "num_test_images"
         if not os.path.exists(self.raw_dir):
             os.makedirs(self.raw_dir)
         if not os.path.exists(self.num_dir):
             os.makedirs(self.num_dir)
         if not os.path.exists(self.test_dir):
             os.makedirs(self.test_dir)
+        if not os.path.exists(self.num_test_dir):
+            os.makedirs(self.num_test_dir)
 
         # Session Manager
         self.session_manager = SessionManager()
@@ -199,10 +202,17 @@ class LabelingTool(QMainWindow):
             self.set_controls_enabled(True)
             return
 
+        # Determine target directory
+        default_dir = self.session_manager.get_save_dir(source_key)
+        
         if self.save_test_cb.isChecked():
-            target_dir = self.test_dir
+            # If default dir is the math dir, use math test dir
+            if default_dir == self.num_dir:
+                target_dir = self.num_test_dir
+            else:
+                target_dir = self.test_dir
         else:
-            target_dir = self.session_manager.get_save_dir(source_key)
+            target_dir = default_dir
             if not os.path.exists(target_dir):
                 os.makedirs(target_dir)
 

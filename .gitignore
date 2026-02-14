@@ -3,6 +3,7 @@
 /test_images
 /templates
 
+/num_test_images
 /synthetic_captchas
 
 /*.jpeg
