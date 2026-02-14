@@ -1,14 +1,26 @@
 import os
+import argparse
 
 
-def inject_model(
-    source_script="solver/standalone.py",
-    model_path="model.onnx",
-    output_path="dist/standalone.py",
-):
+def inject_model(task):
+    if task == "math":
+        model_path = "model_math.onnx"
+        output_path = "dist/standalone_math.py"
+        vocab_type = "math"
+    else:
+        model_path = "model.onnx"
+        output_path = "dist/standalone_alphanumeric.py"
+        vocab_type = "alphanumeric"
+
+    source_script = "solver/standalone.py"
+
     # Create dist dir
     if not os.path.exists("dist"):
         os.makedirs("dist")
+
+    if not os.path.exists(model_path):
+        print(f"Error: Model file {model_path} not found.")
+        return
 
     # Read script content
     with open(source_script, "r") as f:
@@ -18,23 +30,25 @@ def inject_model(
     with open(model_path, "rb") as f:
         model_bytes = f.read()
 
-    # Replace placeholder
-    # We use repr(model_bytes) to get b'...' string representation
-    placeholder = "MODEL_BYTES = None"
-    replacement = f"MODEL_BYTES = {repr(model_bytes)}"
+    # Replace placeholders
+    script_content = script_content.replace(
+        "MODEL_BYTES = None", f"MODEL_BYTES = {repr(model_bytes)}"
+    )
 
-    if placeholder not in script_content:
-        print("Error: Placeholder 'MODEL_BYTES = None' not found in script.")
-        return
-
-    new_content = script_content.replace(placeholder, replacement)
+    script_content = script_content.replace(
+        'VOCAB_TYPE = "alphanumeric"', f'VOCAB_TYPE = "{vocab_type}"'
+    )
 
     # Write to dist
     with open(output_path, "w") as f:
-        f.write(new_content)
+        f.write(script_content)
 
-    print(f"Successfully injected model into {output_path}")
+    print(f"Successfully injected {task} model into {output_path}")
 
 
 if __name__ == "__main__":
-    inject_model()
+    parser = argparse.ArgumentParser(description="Build Standalone Solver")
+    parser.add_argument("task", choices=["alphanumeric", "math"], help="Task to build")
+    args = parser.parse_args()
+
+    inject_model(args.task)

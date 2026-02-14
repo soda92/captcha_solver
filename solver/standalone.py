@@ -5,6 +5,7 @@ import sys
 import io
 
 MODEL_BYTES = None
+VOCAB_TYPE = "alphanumeric"
 
 
 class ImgUtil:
@@ -41,16 +42,20 @@ class ONNXSolver:
         if MODEL_BYTES is not None:
             model_source = MODEL_BYTES
 
-        # Classes: Blank (0) + 32 chars
-        self.chars = sorted(list("23456789ABCDEFGHJKLMNPQRSTUVWXYZ"))
+        # Select Vocabulary based on Injected Type
+        if VOCAB_TYPE == "math":
+            self.chars = sorted(list("0123456789+-=?"))
+        else:
+            self.chars = sorted(list("23456789ABCDEFGHJKLMNPQRSTUVWXYZ"))
+
         self.classes = ["-"] + self.chars
         self.idx_to_char = {i: c for i, c in enumerate(self.classes)}
 
         try:
             self.ort_session = ort.InferenceSession(model_source)
             self.input_name = self.ort_session.get_inputs()[0].name
-        except Exception:
-            # print(f"Error loading model: {e}") # Silent error or handle appropriately
+        except Exception as e:
+            # print(f"Error loading model: {e}")
             self.ort_session = None
 
     def solve(self, img_source):
