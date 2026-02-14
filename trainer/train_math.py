@@ -105,7 +105,6 @@ def train():
     print(f"Training Math CRNN for {EPOCHS} epochs...")
 
     for epoch in range(EPOCHS):
-
         for images, targets in dataloader:
             images = images.to(device)
             targets = targets.to(device)

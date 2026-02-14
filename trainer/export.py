@@ -1,6 +1,7 @@
 import torch
 from solver.ml_solver import CRNN, MLSolver
 
+
 def export():
     # 1. Load Model
     model_path = "model.pth"
@@ -28,6 +29,7 @@ def export():
     )
 
     print(f"Model exported to {output_path}")
+
 
 if __name__ == "__main__":
     export()
